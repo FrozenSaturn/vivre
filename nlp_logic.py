@@ -10,8 +10,17 @@ def process_message(message: str):
     non_actionable_keywords = ["hello", "hi", "reply", "update soon", "pls", "please"]
 
     # 2. Extraction: Product Code, Brand, and Quantity
-    # Codes are 4 consecutive digits
+    # Codes: 4 consecutive digits, or alphanumeric Fallbacks
     codes = re.findall(r"\b\d{4}\b", msg)
+    
+    for match in re.findall(r"\bitem\s+([a-zA-Z0-9_-]+)\b", message, re.IGNORECASE):
+        if match.lower() not in codes:
+            codes.append(match.lower())
+            
+    for match in re.findall(r"\b[A-Z][A-Z0-9]+\b", message):
+        match_lower = match.lower()
+        if match_lower not in codes and match_lower not in (stock_keywords + action_keywords + price_keywords + non_actionable_keywords):
+            codes.append(match_lower)
     
     brands_list = ["vivo", "oppo", "samsung", "redmi", "realme", "apple", "iphone", "xiaomi", "oneplus"]
     found_brands = []

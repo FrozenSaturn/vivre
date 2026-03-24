@@ -37,6 +37,8 @@ def init_db():
     db.close()
 
 def get_product_by_code(db, search_term: str):
-    # Use 'ilike' or 'contains' to be case-insensitive
-    # We search for the 4-digit code within the full name (e.g., '2001' in 'Android2001 vivo')
-    return db.query(Product).filter(Product.name.contains(search_term)).first()
+    query = db.query(Product)
+    if search_term:
+        for term in search_term.split():
+            query = query.filter(Product.name.ilike(f"%{term}%"))
+    return query.first()
