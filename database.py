@@ -13,32 +13,28 @@ Base = declarative_base()
 class Product(Base):
     __tablename__ = "products"
     id = Column(Integer, primary_key=True, index=True)
-    item_code = Column(String, index=True)   # From "Item ID"
-    name = Column(String, index=True)        # From "Item ID2"
-    stock = Column(Float)                    # From "Stock On Hand"
+    item_code = Column(String, index=True)
+    name = Column(String, index=True)
+    stock = Column(Float)
+    price = Column(Float)
 
 # 3. Initialize and Seed Data
 def init_db():
     Base.metadata.create_all(bind=engine)
-    
     db = SessionLocal()
-    try:
-        if db.query(Product).count() == 0:
-            # Using the actual filename from your upload
-            df = pd.read_csv('test_item.csv')
-            for _, row in df.iterrows():
-                item = Product(
-                    item_code=str(row['Item ID']),
-                    name=str(row['Item ID2']),
-                    stock=float(row['Stock On Hand'])
-                )
-                db.add(item)
-            db.commit()
-            print("Database seeded successfully!")
-    except Exception as e:
-        print(f"Error seeding database: {e}")
-    finally:
-        db.close()
+    if db.query(Product).count() == 0:
+        import random
+        df = pd.read_csv('test_item.csv')
+        for _, row in df.iterrows():
+            item = Product(
+                item_code=str(row['Item ID']),
+                name=str(row['Item ID2']),
+                stock=float(row['Stock On Hand']),
+                price=round(random.uniform(100, 1000), 2) 
+            )
+            db.add(item)
+        db.commit()
+    db.close()
 
 def get_product_by_code(db, search_term: str):
     # Use 'ilike' or 'contains' to be case-insensitive
