@@ -155,4 +155,3 @@ cython_debug/
 # Project specific
 stock_app.db
 *.db-journal
-test_item.csv
