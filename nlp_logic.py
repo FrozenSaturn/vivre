@@ -1,85 +1,90 @@
-import re
+import os
+import json
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load the Gemini API key from .env file
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
 
 def process_message(message: str):
-    msg = message.lower().strip()
-    
-    # 1. Define Keyword Groups
-    stock_keywords = ["stock", "available", "pcs", "units", "nos", "have", "qty", "quantity", "confirm", "ready", "hai", "check", "milega", "total", "update", "discontinued", "damage", "available", "batch", "lot", "shade", "lr"]
-    action_keywords = ["block", "bhej", "dispatch", "need", "chahiye", "add", "req", "required", "urgent", "pack", "order", "karo"]
-    price_keywords = ["price", "rate", "cost", "kitna", "bhau"]
-    non_actionable_keywords = ["hello", "hi", "reply", "update soon", "pls", "please"]
+    system_prompt = """You are a Stock Assistant Parser for a warehouse management system. 
+Your task is to parse user messages and extract structured information to query a SQL database.
 
-    # 2. Extraction: Product Code, Brand, and Quantity
-    # Codes: 4 consecutive digits, or alphanumeric Fallbacks
-    codes = re.findall(r"\b\d{4}\b", msg)
-    
-    for match in re.findall(r"\bitem\s+([a-zA-Z0-9_-]+)\b", message, re.IGNORECASE):
-        if match.lower() not in codes:
-            codes.append(match.lower())
+### 1. Intent Classification
+Classify the user's intent into exactly ONE of the following:
+- "check_stock": User asks about availability, current stock, or quantity on hand.
+- "check_price": User asks about the rate, cost, price, or "bhau".
+- "check_stock_and_price": User asks for both (e.g., "What is the price and is it in stock?").
+- "non_actionable": Greetings (Hi/Hello), filler text, or unrelated requests (e.g., "update soon").
+
+### 2. Entity Extraction
+- "product_query": Extract the core item name or alphanumeric code. 
+  * CRITICAL: Strip filler words like "item", "product", "code", "units", "pcs", "nos". 
+  * Example: "item 2006" -> "2006". "vivo 2001" -> "vivo 2001".
+- "quantity": Extract ONLY the numeric value for the requested stock. If no number is mentioned, return null.
+
+### 3. Logic & Multilingual Rules
+- Support Multiple Items: If the user mentions multiple products (e.g., "2001 and 2002 stock?"), extract all into the "queries" list.
+- Hinglish Support: Correcty map Hindi/English hybrid terms to intents:
+  * "hai kya", "milega", "stock batao" -> check_stock
+  * "rate kya hai", "kitna ka hai" -> check_price
+- Handling Variations: Recognize generic examples from the brief like "Item ABC" or "Item X" as valid product_query entities.
+
+### 4. Output Format (Strict JSON)
+You MUST return the entire response as a valid JSON object. Do not include markdown formatting, code blocks, or explanatory text. The response must start with '{' and end with '}'.
+
+JSON Structure:
+{
+  "intent": "check_stock_and_price",
+  "product_query": "Primary Item Name",
+  "quantity": 50,
+  "queries": [
+    {"product_query": "Item 1", "quantity": 50},
+    {"product_query": "Item 2", "quantity": 50}
+  ]
+}
+"""
+
+    try:
+        # We prepend the system prompt to the user message to ensure compatibility
+        full_prompt = f"{system_prompt}\n\nUser Message: {message}"
+        
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        
+        # Generation config to encourage JSON output
+        response = model.generate_content(
+            full_prompt,
+            generation_config={"response_mime_type": "application/json", "temperature": 0.0}
+        )
+        
+        # Parse the JSON response
+        result = json.loads(response.text)
+        
+        intent = result.get("intent", "unknown")
+        product_query = result.get("product_query", "")
+        quantity = result.get("quantity", None)
+        queries = result.get("queries", [])
+        
+        # Ensure 'queries' is a list of dicts with 'product_query'
+        if not queries and product_query:
+            queries = [{"product_query": product_query}]
             
-    for match in re.findall(r"\b[A-Z][A-Z0-9]+\b", message):
-        match_lower = match.lower()
-        if match_lower not in codes and match_lower not in (stock_keywords + action_keywords + price_keywords + non_actionable_keywords):
-            codes.append(match_lower)
-    
-    brands_list = ["vivo", "oppo", "samsung", "redmi", "realme", "apple", "iphone", "xiaomi", "oneplus"]
-    found_brands = []
-    # Using simple split to match whole words and preserve order
-    for token in re.findall(r"\b[a-z]+\b", msg):
-        if token in brands_list:
-            found_brands.append(token)
-
-    # 3. Extract quantity
-    # Find all standalone numbers not in codes
-    numbers = []
-    for match in re.finditer(r"\b\d+\b", msg):
-        val = match.group()
-        if len(val) == 4 and val in codes:
-            continue
-        numbers.append(int(val))
-    
-    # In queries like "79 me se 30 block" or "150 me se 80", the latter number is usually the requested quantity
-    quantity = None
-    if numbers:
-        quantity = numbers[-1]
-
-    # Handle multiple queries by zipping codes and brands
-    queries = []
-    max_len = max(len(codes), len(found_brands))
-    if max_len == 0:
-        queries = [{"product_query": ""}] 
-    else:
-        for i in range(max_len):
-            c = codes[i] if i < len(codes) else ""
-            b = found_brands[i] if i < len(found_brands) else ""
-            query_str = f"{c} {b}".strip()
-            queries.append({"product_query": query_str})
-
-    # For singular backwards compatibility
-    product_query = queries[0]["product_query"] if queries else ""
-
-    # 4. Determine Intent based on keywords
-    intent = "unknown"
-    
-    wants_price = any(word in msg for word in price_keywords)
-    wants_stock = any(word in msg for word in stock_keywords) or any(word in msg for word in action_keywords) or quantity is not None
-    
-    if not codes and not found_brands:
-        if any(word in msg for word in non_actionable_keywords):
-            intent = "non_actionable"
-        # Edge case: maybe words only, but no known brand or code
-        elif any(word in msg for word in price_keywords + stock_keywords + action_keywords):
-            intent = "check_stock" # default to stock check if no entities but has intent words
-    elif wants_price and wants_stock:
-        intent = "check_stock_and_price"
-    elif wants_price:
-        intent = "check_price"
-    elif wants_stock or codes or found_brands:
-        intent = "check_stock"
-
-    return {
-        "intent": intent,
-        "product_query": product_query,
-        "queries": queries,  # exposed for handling multiple
-        "quantity": quantity
-    }
+        return {
+            "intent": intent,
+            "product_query": product_query,
+            "queries": queries,
+            "quantity": quantity
+        }
+        
+    except Exception as e:
+        # Basic error handling: catch API failure or malformed JSON
+        print(f"Error in Gemini parsing: {e}")
+        return {
+            "intent": "unknown",
+            "product_query": "",
+            "queries": [],
+            "quantity": None
+        }

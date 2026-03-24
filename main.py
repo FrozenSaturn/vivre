@@ -52,7 +52,7 @@ async def chat_endpoint(request: ChatRequest, db: Session = Depends(get_db)):
                     })
                     continue
                 
-                qty = nlp_result.get("quantity")
+                qty = q.get("quantity", nlp_result.get("quantity"))
                 stock_res = {
                     "item_name": product.name,
                     "available": product.stock,
