@@ -1,11 +1,11 @@
-# 📦 Vivre - Smart Stock Assistant
+# 📦 Stock Assistant Bot
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0055ff?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://streamlit.io/)
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-8E75B2?style=for-the-badge&logo=google-gemini&logoColor=white)](https://ai.google.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 
-**Vivre** is an AI-powered Warehouse Management Assistant designed to bridge the gap between human language and structured inventory data. Using Google Gemini's advanced LLM capabilities, it parses natural language queries—including hybrid "Hinglish" (Hindi + English)—to provide real-time stock availability and pricing information.
+**Stock Assistant Bot** is an AI-powered Warehouse Management Assistant designed to bridge the gap between human language and structured inventory data. Using Google Gemini's advanced LLM capabilities, it parses natural language queries—including hybrid "Hinglish" (Hindi + English)—to provide real-time stock availability and pricing information.
 
 ---
 
@@ -69,7 +69,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 
 ### 3. Running the Application
 
-Vivre requires both the backend and frontend to be running simultaneously.
+The bot requires both the backend and frontend to be running simultaneously.
 
 **Step A: Start the FastAPI Backend**
 ```bash
